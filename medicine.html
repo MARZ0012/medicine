@@ -1,0 +1,465 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+<title>おくすりチェック</title>
+<style>
+  * {
+    margin: 0;
+    padding: 0;
+    box-sizing: border-box;
+    -webkit-tap-highlight-color: transparent;
+  }
+
+  html, body {
+    height: 100%;
+    font-family: -apple-system, "Hiragino Sans", "ヒラギノ角ゴシック", "Yu Gothic", sans-serif;
+    background: #1a1d23;
+    color: #e8e4dc;
+    overscroll-behavior: none;
+  }
+
+  body {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    padding: 24px 20px 40px;
+    min-height: 100vh;
+  }
+
+  .date {
+    font-size: 15px;
+    color: #8a8578;
+    margin-bottom: 4px;
+    letter-spacing: 0.05em;
+  }
+
+  h1 {
+    font-size: 22px;
+    font-weight: 500;
+    margin-bottom: 28px;
+    letter-spacing: 0.08em;
+    color: #e8e4dc;
+  }
+
+  .cards {
+    width: 100%;
+    max-width: 420px;
+    display: flex;
+    flex-direction: column;
+    gap: 14px;
+  }
+
+  .card {
+    background: #262a32;
+    border-radius: 18px;
+    padding: 20px 22px;
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    cursor: pointer;
+    user-select: none;
+    transition: transform 0.15s ease, background 0.2s ease, border-color 0.2s ease;
+    border: 2px solid #2f343d;
+  }
+
+  .card:active {
+    transform: scale(0.98);
+  }
+
+  .card.done {
+    background: #2d3a2a;
+    border-color: #4a6b3d;
+  }
+
+  .label {
+    display: flex;
+    flex-direction: column;
+    gap: 4px;
+  }
+
+  .meal {
+    font-size: 22px;
+    font-weight: 600;
+    letter-spacing: 0.08em;
+    color: #e8e4dc;
+  }
+
+  .sub {
+    font-size: 13px;
+    color: #8a8578;
+  }
+
+  .card.done .meal {
+    color: #c8e0b8;
+  }
+
+  .card.done .sub {
+    color: #9ab588;
+  }
+
+  .time-stamp {
+    font-size: 14px;
+    color: #c8e0b8;
+    font-feature-settings: "tnum";
+    font-weight: 500;
+  }
+
+  .mark {
+    width: 56px;
+    height: 56px;
+    border-radius: 50%;
+    border: 2px dashed #4a5160;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 30px;
+    color: transparent;
+    transition: all 0.25s ease;
+    flex-shrink: 0;
+  }
+
+  .card.done .mark {
+    background: #6b9650;
+    border: 2px solid #6b9650;
+    color: #fff;
+    transform: scale(1.05);
+  }
+
+  .section-title {
+    width: 100%;
+    max-width: 420px;
+    margin-top: 36px;
+    margin-bottom: 12px;
+    font-size: 14px;
+    color: #8a8578;
+    letter-spacing: 0.1em;
+  }
+
+  .history {
+    width: 100%;
+    max-width: 420px;
+    display: flex;
+    flex-direction: column;
+    gap: 10px;
+  }
+
+  .history-item {
+    background: #21242b;
+    border-radius: 14px;
+    padding: 14px 18px;
+    border: 1px solid #2a2e37;
+  }
+
+  .history-date {
+    font-size: 13px;
+    color: #a8a294;
+    margin-bottom: 10px;
+    font-weight: 500;
+  }
+
+  .history-meals {
+    display: flex;
+    gap: 8px;
+  }
+
+  .history-meal {
+    flex: 1;
+    background: #1a1d23;
+    border-radius: 8px;
+    padding: 8px 10px;
+    border: 1px solid #2a2e37;
+  }
+
+  .history-meal.taken {
+    border-color: #3d5230;
+    background: #232b20;
+  }
+
+  .history-meal-label {
+    font-size: 11px;
+    color: #8a8578;
+    margin-bottom: 2px;
+  }
+
+  .history-meal-time {
+    font-size: 13px;
+    color: #c8e0b8;
+    font-weight: 600;
+    font-feature-settings: "tnum";
+  }
+
+  .history-meal-time.skipped {
+    color: #4a4a4a;
+  }
+
+  .footer {
+    margin-top: 32px;
+    font-size: 12px;
+    color: #6b6558;
+    text-align: center;
+    line-height: 1.7;
+  }
+
+  .reset {
+    margin-top: 10px;
+    font-size: 12px;
+    color: #6b6558;
+    background: none;
+    border: none;
+    padding: 6px 12px;
+    cursor: pointer;
+    text-decoration: underline;
+  }
+
+  .empty {
+    text-align: center;
+    color: #6b6558;
+    font-size: 13px;
+    padding: 20px;
+  }
+</style>
+</head>
+<body>
+  <div class="date" id="date"></div>
+  <h1>おくすり、のんだ?</h1>
+
+  <div class="cards">
+    <div class="card" data-time="asa">
+      <div class="label">
+        <div class="meal">朝</div>
+        <div class="sub" id="sub-asa">朝ごはんの前</div>
+      </div>
+      <div class="mark">○</div>
+    </div>
+
+    <div class="card" data-time="hiru">
+      <div class="label">
+        <div class="meal">昼</div>
+        <div class="sub" id="sub-hiru">昼ごはんの前</div>
+      </div>
+      <div class="mark">○</div>
+    </div>
+
+    <div class="card" data-time="yoru">
+      <div class="label">
+        <div class="meal">夜</div>
+        <div class="sub" id="sub-yoru">夜ごはんの前</div>
+      </div>
+      <div class="mark">○</div>
+    </div>
+  </div>
+
+  <div class="section-title">これまでの記録</div>
+  <div class="history" id="history"></div>
+
+  <div class="footer">
+    タップで ○ / もう一度タップで取り消し
+  </div>
+  <button class="reset" id="resetBtn">今日の記録をリセット</button>
+
+<script>
+  function todayKey() {
+    const d = new Date();
+    const y = d.getFullYear();
+    const m = String(d.getMonth()+1).padStart(2,'0');
+    const day = String(d.getDate()).padStart(2,'0');
+    return `med-${y}-${m}-${day}`;
+  }
+
+  function formatDate(dateStr) {
+    const m = dateStr.match(/^med-(\d+)-(\d+)-(\d+)$/);
+    if (!m) return dateStr;
+    const d = new Date(+m[1], +m[2]-1, +m[3]);
+    const days = ['日','月','火','水','木','金','土'];
+    return `${+m[2]}月${+m[3]}日 (${days[d.getDay()]})`;
+  }
+
+  function formatTime(isoStr) {
+    if (!isoStr) return '';
+    const d = new Date(isoStr);
+    const h = String(d.getHours()).padStart(2,'0');
+    const m = String(d.getMinutes()).padStart(2,'0');
+    return `${h}:${m}`;
+  }
+
+  function showDate() {
+    const d = new Date();
+    const days = ['日','月','火','水','木','金','土'];
+    document.getElementById('date').textContent =
+      `${d.getFullYear()}年 ${d.getMonth()+1}月 ${d.getDate()}日 (${days[d.getDay()]})`;
+  }
+
+  // 保存先:localStorageを優先(普通のブラウザ用)
+  const storage = {
+    async get(key) {
+      try {
+        const v = localStorage.getItem(key);
+        return v ? { value: v } : null;
+      } catch(e) {
+        if (window.storage) return await window.storage.get(key);
+        return null;
+      }
+    },
+    async set(key, value) {
+      try {
+        localStorage.setItem(key, value);
+      } catch(e) {
+        if (window.storage) return await window.storage.set(key, value);
+      }
+    },
+    async list(prefix) {
+      try {
+        const keys = [];
+        for (let i = 0; i < localStorage.length; i++) {
+          const k = localStorage.key(i);
+          if (k && k.startsWith(prefix)) keys.push(k);
+        }
+        return { keys };
+      } catch(e) {
+        if (window.storage) return await window.storage.list(prefix);
+        return { keys: [] };
+      }
+    }
+  };
+
+  const state = { asa: null, hiru: null, yoru: null };
+
+  async function loadState() {
+    try {
+      const result = await storage.get(todayKey());
+      if (result && result.value) {
+        const saved = JSON.parse(result.value);
+        Object.assign(state, saved);
+      }
+    } catch(e) {}
+    render();
+  }
+
+  async function saveState() {
+    try {
+      await storage.set(todayKey(), JSON.stringify(state));
+    } catch(e) {
+      console.error('保存できませんでした', e);
+    }
+  }
+
+  function render() {
+    const subLabels = {
+      asa: '朝ごはんの前',
+      hiru: '昼ごはんの前',
+      yoru: '夜ごはんの前'
+    };
+    document.querySelectorAll('.card').forEach(card => {
+      const t = card.dataset.time;
+      const sub = document.getElementById('sub-' + t);
+      if (state[t]) {
+        card.classList.add('done');
+        sub.innerHTML = `<span class="time-stamp">${formatTime(state[t])} に服用</span>`;
+      } else {
+        card.classList.remove('done');
+        sub.textContent = subLabels[t];
+      }
+    });
+  }
+
+  async function loadHistory() {
+    const historyEl = document.getElementById('history');
+    historyEl.innerHTML = '';
+
+    try {
+      const list = await storage.list('med-');
+      if (!list || !list.keys || list.keys.length === 0) {
+        historyEl.innerHTML = '<div class="empty">まだ記録がありません</div>';
+        return;
+      }
+
+      const today = todayKey();
+      const keys = list.keys
+        .filter(k => k !== today && /^med-\d+-\d+-\d+$/.test(k))
+        .sort()
+        .reverse();
+
+      if (keys.length === 0) {
+        historyEl.innerHTML = '<div class="empty">過去の記録はまだありません</div>';
+        return;
+      }
+
+      for (const key of keys) {
+        try {
+          const result = await storage.get(key);
+          if (!result || !result.value) continue;
+          const data = JSON.parse(result.value);
+
+          const item = document.createElement('div');
+          item.className = 'history-item';
+
+          const meals = [
+            { key: 'asa', label: '朝' },
+            { key: 'hiru', label: '昼' },
+            { key: 'yoru', label: '夜' }
+          ];
+
+          const mealsHtml = meals.map(m => {
+            const taken = !!data[m.key];
+            const timeText = taken ? formatTime(data[m.key]) : '—';
+            return `
+              <div class="history-meal ${taken ? 'taken' : ''}">
+                <div class="history-meal-label">${m.label}</div>
+                <div class="history-meal-time ${taken ? '' : 'skipped'}">${timeText}</div>
+              </div>
+            `;
+          }).join('');
+
+          item.innerHTML = `
+            <div class="history-date">${formatDate(key)}</div>
+            <div class="history-meals">${mealsHtml}</div>
+          `;
+          historyEl.appendChild(item);
+        } catch(e) {}
+      }
+    } catch(e) {
+      historyEl.innerHTML = '<div class="empty">履歴を読み込めませんでした</div>';
+    }
+  }
+
+  document.querySelectorAll('.card').forEach(card => {
+    card.addEventListener('click', async () => {
+      const t = card.dataset.time;
+      if (state[t]) {
+        state[t] = null;
+      } else {
+        state[t] = new Date().toISOString();
+      }
+      render();
+      await saveState();
+    });
+  });
+
+  document.getElementById('resetBtn').addEventListener('click', async () => {
+    if (confirm('今日の記録を消しますか?')) {
+      state.asa = null;
+      state.hiru = null;
+      state.yoru = null;
+      render();
+      await saveState();
+    }
+  });
+
+  setInterval(() => {
+    const newDate = new Date();
+    const currentDisplay = document.getElementById('date').textContent;
+    const days = ['日','月','火','水','木','金','土'];
+    const expected = `${newDate.getFullYear()}年 ${newDate.getMonth()+1}月 ${newDate.getDate()}日 (${days[newDate.getDay()]})`;
+    if (currentDisplay !== expected) {
+      location.reload();
+    }
+  }, 60000);
+
+  showDate();
+  loadState();
+  loadHistory();
+</script>
+</body>
+</html>
