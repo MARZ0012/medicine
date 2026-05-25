@@ -1,0 +1,589 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+<title>おくすりチェック</title>
+<style>
+  * {
+    margin: 0;
+    padding: 0;
+    box-sizing: border-box;
+    -webkit-tap-highlight-color: transparent;
+  }
+
+  html, body {
+    height: 100%;
+    font-family: -apple-system, "Hiragino Sans", "ヒラギノ角ゴシック", "Yu Gothic", sans-serif;
+    background: #1a1d23;
+    color: #e8e4dc;
+    overscroll-behavior: none;
+  }
+
+  body {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    padding: 24px 20px 40px;
+    min-height: 100vh;
+  }
+
+  .date {
+    font-size: 15px;
+    color: #8a8578;
+    margin-bottom: 4px;
+    letter-spacing: 0.05em;
+  }
+
+  h1 {
+    font-size: 22px;
+    font-weight: 500;
+    margin-bottom: 28px;
+    letter-spacing: 0.08em;
+    color: #e8e4dc;
+  }
+
+  .cards {
+    width: 100%;
+    max-width: 420px;
+    display: flex;
+    flex-direction: column;
+    gap: 14px;
+  }
+
+  .card {
+    background: #262a32;
+    border-radius: 18px;
+    padding: 20px 22px;
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    cursor: pointer;
+    user-select: none;
+    transition: transform 0.15s ease, background 0.2s ease, border-color 0.2s ease;
+    border: 2px solid #2f343d;
+  }
+
+  .card:active { transform: scale(0.98); }
+  .card.done {
+    background: #2d3a2a;
+    border-color: #4a6b3d;
+  }
+
+  .label { display: flex; flex-direction: column; gap: 4px; }
+  .meal {
+    font-size: 22px;
+    font-weight: 600;
+    letter-spacing: 0.08em;
+    color: #e8e4dc;
+  }
+  .sub { font-size: 13px; color: #8a8578; }
+  .card.done .meal { color: #c8e0b8; }
+  .card.done .sub { color: #9ab588; }
+  .time-stamp {
+    font-size: 14px;
+    color: #c8e0b8;
+    font-feature-settings: "tnum";
+    font-weight: 500;
+  }
+
+  .mark {
+    width: 56px;
+    height: 56px;
+    border-radius: 50%;
+    border: 2px dashed #4a5160;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 30px;
+    color: transparent;
+    transition: all 0.25s ease;
+    flex-shrink: 0;
+  }
+  .card.done .mark {
+    background: #6b9650;
+    border: 2px solid #6b9650;
+    color: #fff;
+    transform: scale(1.05);
+  }
+
+  .section-title {
+    width: 100%;
+    max-width: 420px;
+    margin-top: 36px;
+    margin-bottom: 12px;
+    font-size: 14px;
+    color: #8a8578;
+    letter-spacing: 0.1em;
+  }
+
+  /* サマリーカード */
+  .summary {
+    width: 100%;
+    max-width: 420px;
+    background: #21242b;
+    border-radius: 14px;
+    padding: 18px 20px;
+    border: 1px solid #2a2e37;
+  }
+  .summary-title {
+    font-size: 12px;
+    color: #8a8578;
+    margin-bottom: 12px;
+    letter-spacing: 0.08em;
+  }
+  .summary-stats {
+    display: flex;
+    gap: 8px;
+    margin-bottom: 14px;
+  }
+  .summary-stat {
+    flex: 1;
+    background: #1a1d23;
+    border-radius: 8px;
+    padding: 10px;
+    text-align: center;
+    border: 1px solid #2a2e37;
+  }
+  .summary-stat-label {
+    font-size: 11px;
+    color: #8a8578;
+    margin-bottom: 4px;
+  }
+  .summary-stat-value {
+    font-size: 20px;
+    font-weight: 600;
+    color: #e8e4dc;
+    font-feature-settings: "tnum";
+  }
+  .summary-stat-value.warn { color: #e0c088; }
+  .summary-stat-value.good { color: #c8e0b8; }
+  .summary-misses {
+    font-size: 13px;
+    color: #a8a294;
+    line-height: 1.8;
+  }
+  .summary-misses .num {
+    color: #e0c088;
+    font-weight: 600;
+    font-feature-settings: "tnum";
+  }
+
+  /* 履歴 */
+  .history {
+    width: 100%;
+    max-width: 420px;
+    display: flex;
+    flex-direction: column;
+    gap: 10px;
+  }
+  .history-item {
+    background: #21242b;
+    border-radius: 14px;
+    padding: 14px 18px;
+    border: 1px solid #2a2e37;
+  }
+  .history-date {
+    font-size: 13px;
+    color: #a8a294;
+    margin-bottom: 10px;
+    font-weight: 500;
+  }
+  .history-meals { display: flex; gap: 8px; }
+  .history-meal {
+    flex: 1;
+    background: #1a1d23;
+    border-radius: 8px;
+    padding: 8px 10px;
+    border: 1px solid #2a2e37;
+  }
+  .history-meal.taken {
+    border-color: #3d5230;
+    background: #232b20;
+  }
+  .history-meal-label {
+    font-size: 11px;
+    color: #8a8578;
+    margin-bottom: 2px;
+  }
+  .history-meal-time {
+    font-size: 13px;
+    color: #c8e0b8;
+    font-weight: 600;
+    font-feature-settings: "tnum";
+  }
+  .history-meal-time.skipped { color: #4a4a4a; }
+
+  .footer {
+    margin-top: 32px;
+    font-size: 12px;
+    color: #6b6558;
+    text-align: center;
+    line-height: 1.7;
+  }
+  .reset {
+    margin-top: 10px;
+    font-size: 12px;
+    color: #6b6558;
+    background: none;
+    border: none;
+    padding: 6px 12px;
+    cursor: pointer;
+    text-decoration: underline;
+  }
+  .empty {
+    text-align: center;
+    color: #6b6558;
+    font-size: 13px;
+    padding: 16px;
+  }
+  .loading {
+    color: #6b6558;
+    font-size: 13px;
+    text-align: center;
+    padding: 16px;
+  }
+</style>
+</head>
+<body>
+  <div class="date" id="date"></div>
+  <h1>おくすり、のんだ?</h1>
+
+  <div class="cards">
+    <div class="card" data-time="asa">
+      <div class="label">
+        <div class="meal">朝</div>
+        <div class="sub" id="sub-asa">朝ごはんの前</div>
+      </div>
+      <div class="mark">○</div>
+    </div>
+    <div class="card" data-time="hiru">
+      <div class="label">
+        <div class="meal">昼</div>
+        <div class="sub" id="sub-hiru">昼ごはんの前</div>
+      </div>
+      <div class="mark">○</div>
+    </div>
+    <div class="card" data-time="yoru">
+      <div class="label">
+        <div class="meal">夜</div>
+        <div class="sub" id="sub-yoru">夜ごはんの前</div>
+      </div>
+      <div class="mark">○</div>
+    </div>
+  </div>
+
+  <div class="section-title">これまでのサマリー(全期間)</div>
+  <div class="summary" id="summary">
+    <div class="loading">集計中...</div>
+  </div>
+
+  <div class="section-title">最近の記録</div>
+  <div class="history" id="history">
+    <div class="loading">読み込み中...</div>
+  </div>
+
+  <div class="footer">タップで ○ / もう一度タップで取り消し</div>
+  <button class="reset" id="resetBtn">今日の記録をリセット</button>
+
+<script>
+  // ===== 設定 =====
+  const DETAIL_DAYS = 7;        // 詳細表示する直近日数
+  const CACHE_KEY = 'med-summary-cache';
+  const CACHE_VERSION = 1;
+
+  // ===== ストレージラッパー =====
+  const storage = {
+    async get(key) {
+      try {
+        const v = localStorage.getItem(key);
+        return v ? { value: v } : null;
+      } catch(e) {
+        if (window.storage) return await window.storage.get(key);
+        return null;
+      }
+    },
+    async set(key, value) {
+      try { localStorage.setItem(key, value); }
+      catch(e) {
+        if (window.storage) return await window.storage.set(key, value);
+      }
+    },
+    async list(prefix) {
+      try {
+        const keys = [];
+        for (let i = 0; i < localStorage.length; i++) {
+          const k = localStorage.key(i);
+          if (k && k.startsWith(prefix)) keys.push(k);
+        }
+        return { keys };
+      } catch(e) {
+        if (window.storage) return await window.storage.list(prefix);
+        return { keys: [] };
+      }
+    }
+  };
+
+  // ===== ユーティリティ =====
+  function todayKey() {
+    const d = new Date();
+    return `med-${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,'0')}-${String(d.getDate()).padStart(2,'0')}`;
+  }
+  function dateKeyFromDate(d) {
+    return `med-${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,'0')}-${String(d.getDate()).padStart(2,'0')}`;
+  }
+  function parseKey(key) {
+    const m = key.match(/^med-(\d+)-(\d+)-(\d+)$/);
+    if (!m) return null;
+    return new Date(+m[1], +m[2]-1, +m[3]);
+  }
+  function formatDate(dateStr) {
+    const d = parseKey(dateStr);
+    if (!d) return dateStr;
+    const days = ['日','月','火','水','木','金','土'];
+    return `${d.getMonth()+1}月${d.getDate()}日 (${days[d.getDay()]})`;
+  }
+  function formatTime(isoStr) {
+    if (!isoStr) return '';
+    const d = new Date(isoStr);
+    return `${String(d.getHours()).padStart(2,'0')}:${String(d.getMinutes()).padStart(2,'0')}`;
+  }
+  function showDate() {
+    const d = new Date();
+    const days = ['日','月','火','水','木','金','土'];
+    document.getElementById('date').textContent =
+      `${d.getFullYear()}年 ${d.getMonth()+1}月 ${d.getDate()}日 (${days[d.getDay()]})`;
+  }
+
+  // ===== 今日の状態 =====
+  const state = { asa: null, hiru: null, yoru: null };
+
+  async function loadState() {
+    try {
+      const result = await storage.get(todayKey());
+      if (result && result.value) Object.assign(state, JSON.parse(result.value));
+    } catch(e) {}
+    render();
+  }
+  async function saveState() {
+    try { await storage.set(todayKey(), JSON.stringify(state)); }
+    catch(e) { console.error('保存できませんでした', e); }
+  }
+
+  function render() {
+    const subLabels = { asa: '朝ごはんの前', hiru: '昼ごはんの前', yoru: '夜ごはんの前' };
+    document.querySelectorAll('.card').forEach(card => {
+      const t = card.dataset.time;
+      const sub = document.getElementById('sub-' + t);
+      if (state[t]) {
+        card.classList.add('done');
+        sub.innerHTML = `<span class="time-stamp">${formatTime(state[t])} に服用</span>`;
+      } else {
+        card.classList.remove('done');
+        sub.textContent = subLabels[t];
+      }
+    });
+  }
+
+  // ===== サマリー(キャッシュ付き) =====
+  // 古い日付ぶんはキャッシュ。最新DETAIL_DAYS日ぶんだけ毎回再計算。
+  async function computeSummary() {
+    const list = await storage.list('med-');
+    if (!list || !list.keys) return null;
+
+    const today = todayKey();
+    const dayKeys = list.keys
+      .filter(k => /^med-\d+-\d+-\d+$/.test(k))
+      .sort();
+    if (dayKeys.length === 0) return null;
+
+    // キャッシュ読み込み
+    let cache = { version: CACHE_VERSION, lastKey: null, totals: { days:0, asa:0, hiru:0, yoru:0, perfect:0 } };
+    try {
+      const c = await storage.get(CACHE_KEY);
+      if (c && c.value) {
+        const parsed = JSON.parse(c.value);
+        if (parsed.version === CACHE_VERSION) cache = parsed;
+      }
+    } catch(e) {}
+
+    // 「キャッシュ後の確定日」を集計に追加
+    // 確定日 = 今日でもなく、直近DETAIL_DAYS日でもない、変わる可能性がない日
+    // ここでは「過去すべての日(今日を除く)」をキャッシュ対象とする(過去は基本変わらない前提)
+    const cutoffDate = new Date();
+    cutoffDate.setHours(0,0,0,0);
+    // キャッシュ対象 = 今日より前の全日
+    const cacheTargetKeys = dayKeys.filter(k => k !== today);
+
+    // キャッシュ未反映の新しい日を抽出
+    const newKeys = cache.lastKey
+      ? cacheTargetKeys.filter(k => k > cache.lastKey)
+      : cacheTargetKeys;
+
+    // 新しい日を読み込んで集計に加算
+    for (const key of newKeys) {
+      try {
+        const r = await storage.get(key);
+        if (!r || !r.value) continue;
+        const d = JSON.parse(r.value);
+        cache.totals.days += 1;
+        if (d.asa) cache.totals.asa += 1;
+        if (d.hiru) cache.totals.hiru += 1;
+        if (d.yoru) cache.totals.yoru += 1;
+        if (d.asa && d.hiru && d.yoru) cache.totals.perfect += 1;
+        cache.lastKey = key;
+      } catch(e) {}
+    }
+
+    // 新しい日があった場合のみキャッシュ更新
+    if (newKeys.length > 0) {
+      try { await storage.set(CACHE_KEY, JSON.stringify(cache)); } catch(e) {}
+    }
+
+    // 今日の分は別途、今ロード済みのstateから足す(キャッシュには入れない)
+    const totalDays = cache.totals.days + 1;
+    const totalAsa = cache.totals.asa + (state.asa ? 1 : 0);
+    const totalHiru = cache.totals.hiru + (state.hiru ? 1 : 0);
+    const totalYoru = cache.totals.yoru + (state.yoru ? 1 : 0);
+    const totalPerfect = cache.totals.perfect + (state.asa && state.hiru && state.yoru ? 1 : 0);
+
+    return {
+      days: totalDays,
+      missAsa: totalDays - totalAsa,
+      missHiru: totalDays - totalHiru,
+      missYoru: totalDays - totalYoru,
+      perfect: totalPerfect
+    };
+  }
+
+  function renderSummary(s) {
+    const el = document.getElementById('summary');
+    if (!s || s.days === 0) {
+      el.innerHTML = '<div class="empty">記録がまだありません</div>';
+      return;
+    }
+    const totalMiss = s.missAsa + s.missHiru + s.missYoru;
+    const perfectRate = Math.round((s.perfect / s.days) * 100);
+    el.innerHTML = `
+      <div class="summary-title">記録した日数:${s.days}日</div>
+      <div class="summary-stats">
+        <div class="summary-stat">
+          <div class="summary-stat-label">完璧な日</div>
+          <div class="summary-stat-value good">${s.perfect}<span style="font-size:13px;color:#8a8578;">日</span></div>
+        </div>
+        <div class="summary-stat">
+          <div class="summary-stat-label">達成率</div>
+          <div class="summary-stat-value ${perfectRate >= 80 ? 'good' : perfectRate >= 50 ? '' : 'warn'}">${perfectRate}<span style="font-size:13px;color:#8a8578;">%</span></div>
+        </div>
+        <div class="summary-stat">
+          <div class="summary-stat-label">飲み忘れ</div>
+          <div class="summary-stat-value ${totalMiss === 0 ? 'good' : 'warn'}">${totalMiss}<span style="font-size:13px;color:#8a8578;">回</span></div>
+        </div>
+      </div>
+      <div class="summary-misses">
+        飲み忘れ内訳:
+        朝 <span class="num">${s.missAsa}</span>回 /
+        昼 <span class="num">${s.missHiru}</span>回 /
+        夜 <span class="num">${s.missYoru}</span>回
+      </div>
+    `;
+  }
+
+  // ===== 詳細履歴(直近DETAIL_DAYS日) =====
+  async function loadHistory() {
+    const el = document.getElementById('history');
+
+    const list = await storage.list('med-');
+    if (!list || !list.keys) {
+      el.innerHTML = '<div class="empty">記録がまだありません</div>';
+      return;
+    }
+
+    const today = todayKey();
+    const keys = list.keys
+      .filter(k => k !== today && /^med-\d+-\d+-\d+$/.test(k))
+      .sort()
+      .reverse()
+      .slice(0, DETAIL_DAYS);
+
+    if (keys.length === 0) {
+      el.innerHTML = '<div class="empty">過去の記録はまだありません</div>';
+      return;
+    }
+
+    el.innerHTML = '';
+    for (const key of keys) {
+      try {
+        const r = await storage.get(key);
+        if (!r || !r.value) continue;
+        const data = JSON.parse(r.value);
+
+        const meals = [
+          { key: 'asa', label: '朝' },
+          { key: 'hiru', label: '昼' },
+          { key: 'yoru', label: '夜' }
+        ];
+        const mealsHtml = meals.map(m => {
+          const taken = !!data[m.key];
+          const timeText = taken ? formatTime(data[m.key]) : '—';
+          return `
+            <div class="history-meal ${taken ? 'taken' : ''}">
+              <div class="history-meal-label">${m.label}</div>
+              <div class="history-meal-time ${taken ? '' : 'skipped'}">${timeText}</div>
+            </div>
+          `;
+        }).join('');
+
+        const item = document.createElement('div');
+        item.className = 'history-item';
+        item.innerHTML = `
+          <div class="history-date">${formatDate(key)}</div>
+          <div class="history-meals">${mealsHtml}</div>
+        `;
+        el.appendChild(item);
+      } catch(e) {}
+    }
+  }
+
+  // ===== イベント =====
+  document.querySelectorAll('.card').forEach(card => {
+    card.addEventListener('click', async () => {
+      const t = card.dataset.time;
+      state[t] = state[t] ? null : new Date().toISOString();
+      render();
+      await saveState();
+      // 今日の状態が変わったのでサマリーも更新
+      computeSummary().then(renderSummary);
+    });
+  });
+
+  document.getElementById('resetBtn').addEventListener('click', async () => {
+    if (confirm('今日の記録を消しますか?')) {
+      state.asa = null;
+      state.hiru = null;
+      state.yoru = null;
+      render();
+      await saveState();
+      computeSummary().then(renderSummary);
+    }
+  });
+
+  // ===== 日付変更の自動リロード =====
+  setInterval(() => {
+    const d = new Date();
+    const days = ['日','月','火','水','木','金','土'];
+    const expected = `${d.getFullYear()}年 ${d.getMonth()+1}月 ${d.getDate()}日 (${days[d.getDay()]})`;
+    if (document.getElementById('date').textContent !== expected) location.reload();
+  }, 60000);
+
+  // ===== 起動 =====
+  (async () => {
+    showDate();
+    await loadState();
+    // 履歴とサマリーは並列で読み込む(待ち時間短縮)
+    loadHistory();
+    computeSummary().then(renderSummary);
+  })();
+</script>
+</body>
+</html>
