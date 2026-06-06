@@ -197,20 +197,6 @@
     font-weight: 600;
   }
 
-  .next-hint {
-    font-size: 13px;
-    color: #d8a85a;
-    font-weight: 500;
-  }
-
-  /* まだ前の薬から時間が経ってないカード */
-  .card.too-soon {
-    border-color: #5a4d2e;
-  }
-  .card.too-soon .mark {
-    border-color: #6a5d3e;
-  }
-
   .mark {
     width: 56px;
     height: 56px;
@@ -592,28 +578,6 @@
     set(_, prop, value) { todayState()[prop] = value; return true; }
   });
 
-  // 服用間隔の目安(時間)。次に飲める目安の計算に使う(厳密管理ではない)
-  const INTERVAL_HOURS = 4;
-
-  // 今日のうち一番最後に飲んだ時刻を返す(なければ null)
-  function lastTakenDate() {
-    const td = todayState();
-    const times = ['asa','hiru','yoru']
-      .map(t => td[t])
-      .filter(Boolean)
-      .map(iso => new Date(iso));
-    if (times.length === 0) return null;
-    return new Date(Math.max(...times.map(d => d.getTime())));
-  }
-
-  // 次に飲める目安まで「あと何分」か。0以下なら今飲んでOK
-  function minutesUntilNext() {
-    const last = lastTakenDate();
-    if (!last) return 0;
-    const next = last.getTime() + INTERVAL_HOURS * 3600000;
-    return Math.round((next - Date.now()) / 60000);
-  }
-
   // 保存：localな控え + クラウドへ全データ上書き
   async function saveState() {
     writeLocalAll();
@@ -660,27 +624,15 @@
       hiru: '昼ごはんの前',
       yoru: '夜ごはんの前'
     };
-    const mins = minutesUntilNext();
     document.querySelectorAll('.card').forEach(card => {
       const t = card.dataset.time;
       const sub = document.getElementById('sub-' + t);
       if (state[t]) {
         card.classList.add('done');
-        card.classList.remove('too-soon');
         sub.innerHTML = `<span class="time-stamp">${formatTime(state[t])} に服用</span>`;
       } else {
         card.classList.remove('done');
-        if (mins > 0) {
-          // まだ前の薬から時間が経っていない
-          card.classList.add('too-soon');
-          const h = Math.floor(mins / 60);
-          const m = mins % 60;
-          const ago = h > 0 ? `あと約${h}時間${m > 0 ? m + '分' : ''}` : `あと約${m}分`;
-          sub.innerHTML = `<span class="next-hint">${ago}で目安</span>`;
-        } else {
-          card.classList.remove('too-soon');
-          sub.textContent = subLabels[t];
-        }
+        sub.textContent = subLabels[t];
       }
     });
   }
@@ -812,16 +764,6 @@
     if (state[t]) {
       state[t] = null;
     } else {
-      // まだ前の薬から時間が経っていなければ確認
-      const mins = minutesUntilNext();
-      if (mins > 0) {
-        const h = Math.floor(mins / 60);
-        const m = mins % 60;
-        const remain = h > 0 ? `約${h}時間${m > 0 ? m + '分' : ''}` : `約${m}分`;
-        if (!confirm(`まだ前の薬から時間が経っていません(目安まで${remain})。飲みますか?`)) {
-          return;
-        }
-      }
       state[t] = new Date().toISOString();
     }
     render();
@@ -866,6 +808,7 @@
     }
   });
 
+  // 日付が変わったら（日付表示が変わったら）リロードして今日の枠を作り直す
   setInterval(() => {
     const newDate = new Date();
     const currentDisplay = document.getElementById('date').textContent;
@@ -873,8 +816,6 @@
     const expected = `${newDate.getFullYear()}年 ${newDate.getMonth()+1}月 ${newDate.getDate()}日 (${days[newDate.getDay()]})`;
     if (currentDisplay !== expected) {
       location.reload();
-    } else {
-      render(); // 「あと約◯時間」の表示を更新
     }
   }, 60000);
 
