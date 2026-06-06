@@ -4,6 +4,92 @@
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
 <title>おくすりチェック</title>
+
+<!-- ホーム画面アイコン（iPhone / Android）。3ファイルはリポジトリ最上位に同階層で置く -->
+<link rel="apple-touch-icon" href="apple-touch-icon.png">
+<link rel="apple-touch-icon" sizes="512x512" href="apple-touch-icon-512.png">
+<link rel="icon" type="image/png" href="apple-touch-icon-512.png">
+<meta name="apple-mobile-web-app-title" content="おくすり">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+<meta name="mobile-web-app-capable" content="yes">
+<meta name="theme-color" content="#1b1a23">
+<script>
+  // インライン Web App Manifest（単一HTMLのままホーム画面に追加できるようにする）
+  (function(){
+    const manifest={
+      name:"おくすりチェック", short_name:"おくすり",
+      start_url:".", display:"standalone",
+      background_color:"#1b1a23", theme_color:"#1b1a23",
+      icons:[
+        {src:"apple-touch-icon-512.png", sizes:"512x512", type:"image/png"},
+        {src:"apple-touch-icon.png", sizes:"180x180", type:"image/png"}
+      ]
+    };
+    try{
+      const blob=new Blob([JSON.stringify(manifest)],{type:"application/manifest+json"});
+      const link=document.createElement("link");
+      link.rel="manifest"; link.href=URL.createObjectURL(blob);
+      document.head.appendChild(link);
+    }catch(e){}
+  })();
+</script>
+
+<!-- Firebase SDK（Progress Deck と同じ 9.23.0 compat 版） -->
+<script src="https://cdn.jsdelivr.net/npm/firebase@9.23.0/firebase-app-compat.min.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/firebase@9.23.0/firebase-database-compat.min.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/firebase@9.23.0/firebase-auth-compat.min.js"></script>
+<script>
+  // Progress Deck と同じプロジェクトの config をそのまま流用（apiKey は公開前提で問題なし）
+  const firebaseConfig = {
+    apiKey: "AIzaSyD9h01ojm1udmPDa1P-5UzSfcs0_Q6cbg0",
+    authDomain: "progress-deck.firebaseapp.com",
+    databaseURL: "https://progress-deck-default-rtdb.asia-southeast1.firebasedatabase.app",
+    projectId: "progress-deck",
+    storageBucket: "progress-deck.firebasestorage.app",
+    messagingSenderId: "22418933605",
+    appId: "1:22418933605:web:c1d4985c452572685e438c"
+  };
+  firebase.initializeApp(firebaseConfig);
+  const _fbDb = firebase.database();
+  // 薬アプリは progressDeck とは別ノード medicineApp を使う（データが混ざらないように）
+  const _fbRef = _fbDb.ref('medicineApp');
+  const _fbAuth = firebase.auth();
+
+  window._fbReady = false;
+  window._firebaseData = null;
+  window._fbAuthError = null;
+
+  // 全データ（med-YYYY-MM-DD を全部）をまとめてクラウドへ上書き保存
+  window.firebaseSave = function(allData) {
+    return _fbRef.set(allData).catch(e => console.error("Firebase save error:", e));
+  };
+
+  // ログイン成功後に1回だけ読み込む
+  function _loadFromFirebase() {
+    _fbRef.once('value', (snapshot) => {
+      window._fbReady = true;
+      const val = snapshot.val();
+      window._firebaseData = (val && typeof val === 'object') ? val : null;
+      if (window._onFirebaseReady) window._onFirebaseReady(window._firebaseData);
+    }, (err) => {
+      console.error("Firebase read error:", err);
+      window._fbAuthError = "DBアクセスが拒否されました（ルール設定を確認してください）";
+      window._fbReady = true;
+      if (window._onFirebaseReady) window._onFirebaseReady(null);
+    });
+  }
+
+  // まず匿名ログイン。成功したらデータ読み込みへ。
+  _fbAuth.signInAnonymously().catch((e) => {
+    console.error("匿名ログイン失敗:", e);
+    window._fbAuthError = "匿名ログインに失敗しました（Authentication設定を確認）";
+    if (window._onFirebaseReady) window._onFirebaseReady(null);
+  });
+  _fbAuth.onAuthStateChanged((user) => {
+    if (user) _loadFromFirebase();
+  });
+</script>
 <style>
   * {
     margin: 0;
@@ -15,8 +101,8 @@
   html, body {
     height: 100%;
     font-family: -apple-system, "Hiragino Sans", "ヒラギノ角ゴシック", "Yu Gothic", sans-serif;
-    background: #1a1d23;
-    color: #e8e4dc;
+    background: #1b1a23;
+    color: #e9e7f0;
     overscroll-behavior: none;
   }
 
@@ -30,7 +116,7 @@
 
   .date {
     font-size: 15px;
-    color: #8a8578;
+    color: #9b97b5;
     margin-bottom: 4px;
     letter-spacing: 0.05em;
   }
@@ -38,9 +124,9 @@
   h1 {
     font-size: 22px;
     font-weight: 500;
-    margin-bottom: 28px;
+    margin-bottom: 22px;
     letter-spacing: 0.08em;
-    color: #e8e4dc;
+    color: #e9e7f0;
   }
 
   .cards {
@@ -52,7 +138,7 @@
   }
 
   .card {
-    background: #262a32;
+    background: #2a2838;
     border-radius: 18px;
     padding: 20px 22px;
     display: flex;
@@ -60,17 +146,26 @@
     justify-content: space-between;
     cursor: pointer;
     user-select: none;
-    transition: transform 0.15s ease, background 0.2s ease, border-color 0.2s ease;
-    border: 2px solid #2f343d;
+    transition: transform 0.15s ease, background 0.25s ease, border-color 0.25s ease;
+    border: 2px solid #3a3750;
   }
 
   .card:active {
     transform: scale(0.98);
   }
 
+  /* 服用済み：朝昼夜それぞれサイアン⇔紫⇔サーモンの幅広グラデーション */
   .card.done {
-    background: #2d3a2a;
-    border-color: #4a6b3d;
+    border: 2px solid transparent;
+  }
+  .card[data-time="asa"].done {
+    background: linear-gradient(115deg,#a98ee0 0%,#c98fc0 45%,#e0989a 78%,#eaa384 100%);
+  }
+  .card[data-time="hiru"].done {
+    background: linear-gradient(115deg,#63cdd0 0%,#86c79f 40%,#b3b87f 70%,#cdba8f 100%);
+  }
+  .card[data-time="yoru"].done {
+    background: linear-gradient(115deg,#5ec8e0 0%,#7f9ce0 45%,#a98ee0 78%,#bb8ed8 100%);
   }
 
   .label {
@@ -83,27 +178,23 @@
     font-size: 22px;
     font-weight: 600;
     letter-spacing: 0.08em;
-    color: #e8e4dc;
+    color: #e9e7f0;
   }
 
   .sub {
     font-size: 13px;
-    color: #8a8578;
+    color: #9b97b5;
   }
 
-  .card.done .meal {
-    color: #c8e0b8;
-  }
-
-  .card.done .sub {
-    color: #9ab588;
-  }
+  /* グラデ上の文字は濃色で読みやすく */
+  .card.done .meal { color: #2a2440; }
+  .card.done .sub { color: #38304f; }
 
   .time-stamp {
     font-size: 14px;
-    color: #c8e0b8;
+    color: #38304f;
     font-feature-settings: "tnum";
-    font-weight: 500;
+    font-weight: 600;
   }
 
   .next-hint {
@@ -117,14 +208,14 @@
     border-color: #5a4d2e;
   }
   .card.too-soon .mark {
-    border-color: #5a4d2e;
+    border-color: #6a5d3e;
   }
 
   .mark {
     width: 56px;
     height: 56px;
     border-radius: 50%;
-    border: 2px dashed #4a5160;
+    border: 2px dashed #565275;
     display: flex;
     align-items: center;
     justify-content: center;
@@ -135,8 +226,8 @@
   }
 
   .card.done .mark {
-    background: #6b9650;
-    border: 2px solid #6b9650;
+    background: rgba(42,36,64,0.82);
+    border: 2px solid rgba(42,36,64,0.4);
     color: #fff;
     transform: scale(1.05);
   }
@@ -147,7 +238,7 @@
     margin-top: 36px;
     margin-bottom: 12px;
     font-size: 14px;
-    color: #8a8578;
+    color: #9b97b5;
     letter-spacing: 0.1em;
   }
 
@@ -160,15 +251,15 @@
   }
 
   .history-item {
-    background: #21242b;
+    background: #211f2c;
     border-radius: 14px;
     padding: 14px 18px;
-    border: 1px solid #2a2e37;
+    border: 1px solid #322f44;
   }
 
   .history-date {
     font-size: 13px;
-    color: #a8a294;
+    color: #b6b1cf;
     margin-bottom: 10px;
     font-weight: 500;
   }
@@ -180,38 +271,38 @@
 
   .history-meal {
     flex: 1;
-    background: #1a1d23;
+    background: #1b1a23;
     border-radius: 8px;
     padding: 8px 10px;
-    border: 1px solid #2a2e37;
+    border: 1px solid #322f44;
   }
 
   .history-meal.taken {
-    border-color: #3d5230;
-    background: #232b20;
+    border-color: #4a4570;
+    background: #252238;
   }
 
   .history-meal-label {
     font-size: 11px;
-    color: #8a8578;
+    color: #9b97b5;
     margin-bottom: 2px;
   }
 
   .history-meal-time {
     font-size: 13px;
-    color: #c8e0b8;
+    color: #bfb6ec;
     font-weight: 600;
     font-feature-settings: "tnum";
   }
 
   .history-meal-time.skipped {
-    color: #4a4a4a;
+    color: #4a4760;
   }
 
   .footer {
     margin-top: 32px;
     font-size: 12px;
-    color: #6b6558;
+    color: #6b6788;
     text-align: center;
     line-height: 1.7;
   }
@@ -219,7 +310,7 @@
   .reset {
     margin-top: 10px;
     font-size: 12px;
-    color: #6b6558;
+    color: #6b6788;
     background: none;
     border: none;
     padding: 6px 12px;
@@ -229,7 +320,7 @@
 
   .empty {
     text-align: center;
-    color: #6b6558;
+    color: #6b6788;
     font-size: 13px;
     padding: 20px;
   }
@@ -238,8 +329,8 @@
     width: 100%;
     max-width: 420px;
     margin-top: 36px;
-    background: #21242b;
-    border: 1px solid #2a2e37;
+    background: #211f2c;
+    border: 1px solid #322f44;
     border-radius: 14px;
     padding: 18px 20px;
     text-align: center;
@@ -248,14 +339,14 @@
   .start-info .big {
     font-size: 28px;
     font-weight: 600;
-    color: #c8e0b8;
+    color: #bfb6ec;
     font-feature-settings: "tnum";
     letter-spacing: 0.04em;
   }
 
   .start-info .small {
     font-size: 12px;
-    color: #8a8578;
+    color: #9b97b5;
     margin-top: 4px;
   }
 
@@ -263,17 +354,16 @@
     width: 100%;
     max-width: 420px;
     font-size: 11px;
-    color: #6b6558;
+    color: #6b6788;
     text-align: right;
-    margin-top: 6px;
-    margin-bottom: -6px;
+    margin-bottom: 10px;
   }
 
   /* 時間変更モーダル */
   .modal-bg {
     position: fixed;
     inset: 0;
-    background: rgba(0,0,0,0.6);
+    background: rgba(0,0,0,0.65);
     display: none;
     align-items: center;
     justify-content: center;
@@ -284,24 +374,24 @@
   .modal-bg.show { display: flex; }
 
   .modal {
-    background: #262a32;
+    background: #2a2838;
     border-radius: 18px;
     padding: 24px;
     width: 100%;
     max-width: 320px;
-    border: 2px solid #2f343d;
+    border: 2px solid #3a3750;
   }
 
   .modal-title {
     font-size: 17px;
     font-weight: 600;
-    color: #e8e4dc;
+    color: #e9e7f0;
     margin-bottom: 4px;
   }
 
   .modal-sub {
     font-size: 12px;
-    color: #8a8578;
+    color: #9b97b5;
     margin-bottom: 18px;
   }
 
@@ -309,10 +399,10 @@
     width: 100%;
     font-size: 26px;
     padding: 12px;
-    background: #1a1d23;
-    border: 2px solid #3a4150;
+    background: #1b1a23;
+    border: 2px solid #4a4570;
     border-radius: 12px;
-    color: #e8e4dc;
+    color: #e9e7f0;
     text-align: center;
     font-feature-settings: "tnum";
     margin-bottom: 18px;
@@ -335,12 +425,12 @@
   }
 
   .btn-cancel {
-    background: #3a3f49;
-    color: #c8c4ba;
+    background: #3a3750;
+    color: #c8c4da;
   }
 
   .btn-ok {
-    background: #6b9650;
+    background: linear-gradient(115deg,#7f9ce0,#a98ee0);
     color: #fff;
   }
 </style>
@@ -385,8 +475,8 @@
   <div class="history" id="history"></div>
 
   <div class="footer">
-    タップで ○ / もう一度タップで取り消し<br>
-    長押しで時間を変更
+    タップで記録 / もう一度タップで取り消し<br>
+    長押しで時間を変更できます
   </div>
   <button class="reset" id="resetBtn">今日の記録をリセット</button>
 
@@ -435,48 +525,81 @@
       `${d.getFullYear()}年 ${d.getMonth()+1}月 ${d.getDate()}日 (${days[d.getDay()]})`;
   }
 
-  // 保存先:localStorageを優先(普通のブラウザ用)
-  const storage = {
-    async get(key) {
-      try {
-        const v = localStorage.getItem(key);
-        return v ? { value: v } : null;
-      } catch(e) {
-        if (window.storage) return await window.storage.get(key);
-        return null;
-      }
-    },
-    async set(key, value) {
-      try {
-        localStorage.setItem(key, value);
-      } catch(e) {
-        if (window.storage) return await window.storage.set(key, value);
-      }
-    },
-    async list(prefix) {
-      try {
-        const keys = [];
-        for (let i = 0; i < localStorage.length; i++) {
-          const k = localStorage.key(i);
-          if (k && k.startsWith(prefix)) keys.push(k);
-        }
-        return { keys };
-      } catch(e) {
-        if (window.storage) return await window.storage.list(prefix);
-        return { keys: [] };
-      }
-    }
-  };
+  // ===== データ層 =====
+  // 全日分を1つのオブジェクトで保持: { "med-YYYY-MM-DD": {asa,hiru,yoru}, ... }
+  // これを Firebase の medicineApp ノードへ丸ごと保存し、localStorage にも控えを残す。
+  let allDays = {};
 
-  const state = { asa: null, hiru: null, yoru: null };
+  const LS_PREFIX = 'med-';            // 旧localStorage形式（1日1キー）と互換
+  const LS_BLOB = 'medicineApp.all';   // まとめて控える用
+
+  // localStorage から全日分を読む（旧形式の個別キーも拾って移行する）
+  function readLocalAll() {
+    const out = {};
+    try {
+      // まずまとめ控えを読む
+      const blob = localStorage.getItem(LS_BLOB);
+      if (blob) {
+        const parsed = JSON.parse(blob);
+        if (parsed && typeof parsed === 'object') Object.assign(out, parsed);
+      }
+      // 旧形式の個別キー(med-YYYY-MM-DD)も拾う
+      for (let i = 0; i < localStorage.length; i++) {
+        const k = localStorage.key(i);
+        if (k && /^med-\d+-\d+-\d+$/.test(k)) {
+          try {
+            const v = JSON.parse(localStorage.getItem(k));
+            if (v && typeof v === 'object' && !out[k]) out[k] = v;
+          } catch(e) {}
+        }
+      }
+    } catch(e) {}
+    return out;
+  }
+
+  // localStorage へ控える（まとめ + 当日個別キー）
+  function writeLocalAll() {
+    try {
+      localStorage.setItem(LS_BLOB, JSON.stringify(allDays));
+      const tk = todayKey();
+      if (allDays[tk]) localStorage.setItem(tk, JSON.stringify(allDays[tk]));
+    } catch(e) {}
+  }
+
+  // 2つの allDays をマージ（中身のある日付を優先。両方あれば「服用済みの数が多い方」を採用）
+  function mergeDays(a, b) {
+    const out = {};
+    const keys = new Set([...Object.keys(a||{}), ...Object.keys(b||{})]);
+    const score = d => ['asa','hiru','yoru'].filter(k => d && d[k]).length;
+    keys.forEach(k => {
+      const da = a && a[k], db = b && b[k];
+      if (da && db) out[k] = score(db) > score(da) ? db : da;
+      else out[k] = da || db;
+    });
+    return out;
+  }
+
+  // 今日の state（allDays への参照。なければ作る）
+  function todayState() {
+    const tk = todayKey();
+    if (!allDays[tk]) allDays[tk] = { asa: null, hiru: null, yoru: null };
+    return allDays[tk];
+  }
+
+  // state は常に「今日」を指す getter 経由で使う
+  const state = new Proxy({}, {
+    get(_, prop) { return todayState()[prop]; },
+    set(_, prop, value) { todayState()[prop] = value; return true; }
+  });
 
   // 服用間隔の目安(時間)。次に飲める目安の計算に使う(厳密管理ではない)
   const INTERVAL_HOURS = 4;
 
   // 今日のうち一番最後に飲んだ時刻を返す(なければ null)
   function lastTakenDate() {
+    const td = todayState();
     const times = ['asa','hiru','yoru']
-      .map(t => state[t])
+      .map(t => td[t])
       .filter(Boolean)
       .map(iso => new Date(iso));
     if (times.length === 0) return null;
@@ -491,23 +614,44 @@
     return Math.round((next - Date.now()) / 60000);
   }
 
-  async function loadState() {
+  // 保存：localな控え + クラウドへ全データ上書き
+  async function saveState() {
+    writeLocalAll();
     try {
-      const result = await storage.get(todayKey());
-      if (result && result.value) {
-        const saved = JSON.parse(result.value);
-        Object.assign(state, saved);
-      }
-    } catch(e) {}
-    render();
+      if (window.firebaseSave) await window.firebaseSave(allDays);
+    } catch(e) {
+      console.error('クラウド保存に失敗（ローカルには保存済み）', e);
+    }
   }
 
-  async function saveState() {
-    try {
-      await storage.set(todayKey(), JSON.stringify(state));
-    } catch(e) {
-      console.error('保存できませんでした', e);
-    }
+  // 起動：まずローカルですぐ描画 → クラウドが来たらマージして再描画＆吸い上げ
+  function initData() {
+    allDays = readLocalAll();
+    render();
+    loadHistory();
+
+    // Firebase の読み込み完了コールバック
+    window._onFirebaseReady = function(cloud) {
+      if (cloud && typeof cloud === 'object') {
+        // クラウド形式の検証：med-YYYY-MM-DD のキーだけ採用
+        const cleaned = {};
+        Object.keys(cloud).forEach(k => {
+          if (/^med-\d+-\d+-\d+$/.test(k)) cleaned[k] = cloud[k];
+        });
+        const merged = mergeDays(allDays, cleaned);
+        allDays = merged;
+        render();
+        loadHistory();
+        // ローカルにしかなかった分をクラウドへ吸い上げ（初回移行）
+        writeLocalAll();
+        if (window.firebaseSave) window.firebaseSave(allDays).catch(()=>{});
+      } else if (window._fbReady && Object.keys(allDays).length > 0) {
+        // クラウドが空でローカルに記録あり → 移行アップロード
+        if (window.firebaseSave) window.firebaseSave(allDays).catch(()=>{});
+      }
+    };
+    // もし既にFirebaseが読み込み終わっていたら即実行
+    if (window._fbReady) window._onFirebaseReady(window._firebaseData);
   }
 
   function render() {
@@ -541,36 +685,35 @@
     });
   }
 
-  async function loadHistory() {
+  function loadHistory() {
     const historyEl = document.getElementById('history');
     historyEl.innerHTML = '';
 
     try {
-      const list = await storage.list('med-');
-      if (!list || !list.keys || list.keys.length === 0) {
+      const allKeys = Object.keys(allDays)
+        .filter(k => /^med-\d+-\d+-\d+$/.test(k))
+        .sort();
+
+      if (allKeys.length === 0) {
+        document.getElementById('startInfo').style.display = 'none';
         historyEl.innerHTML = '<div class="empty">まだ記録がありません</div>';
         return;
       }
 
       const today = todayKey();
-      const allKeys = list.keys
-        .filter(k => /^med-\d+-\d+-\d+$/.test(k))
-        .sort();
 
       // 記録開始日からの日数を表示
-      if (allKeys.length > 0) {
-        const first = allKeys[0].match(/^med-(\d+)-(\d+)-(\d+)$/);
-        if (first) {
-          const startDate = new Date(+first[1], +first[2]-1, +first[3]);
-          const now = new Date();
-          now.setHours(0,0,0,0);
-          startDate.setHours(0,0,0,0);
-          const days = Math.floor((now - startDate) / 86400000) + 1;
-          document.getElementById('startDays').textContent = `${days}日目`;
-          document.getElementById('startSince').textContent =
-            `${+first[2]}月${+first[3]}日から記録中`;
-          document.getElementById('startInfo').style.display = 'block';
-        }
+      const first = allKeys[0].match(/^med-(\d+)-(\d+)-(\d+)$/);
+      if (first) {
+        const startDate = new Date(+first[1], +first[2]-1, +first[3]);
+        const now = new Date();
+        now.setHours(0,0,0,0);
+        startDate.setHours(0,0,0,0);
+        const days = Math.floor((now - startDate) / 86400000) + 1;
+        document.getElementById('startDays').textContent = `${days}日目`;
+        document.getElementById('startSince').textContent =
+          `${+first[2]}月${+first[3]}日から記録中`;
+        document.getElementById('startInfo').style.display = 'block';
       }
 
       // 過去7日分(今日を除く)だけ表示
@@ -586,9 +729,8 @@
 
       for (const key of keys) {
         try {
-          const result = await storage.get(key);
-          if (!result || !result.value) continue;
-          const data = JSON.parse(result.value);
+          const data = allDays[key];
+          if (!data) continue;
 
           const item = document.createElement('div');
           item.className = 'history-item';
@@ -660,6 +802,7 @@
       d.setHours(h, m, 0, 0);
       state[editingTime] = d.toISOString();
       render();
+      loadHistory();
       await saveState();
     }
     closeTimeModal();
@@ -682,6 +825,7 @@
       state[t] = new Date().toISOString();
     }
     render();
+    loadHistory();
     await saveState();
   }
 
@@ -717,6 +861,7 @@
       state.hiru = null;
       state.yoru = null;
       render();
+      loadHistory();
       await saveState();
     }
   });
@@ -734,8 +879,7 @@
   }, 60000);
 
   showDate();
-  loadState();
-  loadHistory();
+  initData();
 </script>
 </body>
 </html>
