@@ -263,6 +263,15 @@
     border: 1px solid #322f44;
   }
 
+  .history-meal.hist-edit {
+    cursor: pointer;
+    user-select: none;
+    transition: transform 0.12s ease, border-color 0.2s ease;
+  }
+  .history-meal.hist-edit:active {
+    transform: scale(0.94);
+  }
+
   .history-meal.taken {
     border-color: #4a4570;
     background: #252238;
@@ -457,7 +466,7 @@
     <div class="small" id="startSince"></div>
   </div>
 
-  <div class="section-title">この1週間の記録</div>
+  <div class="section-title">この1週間の記録<span style="font-size:11px;color:#6b6788;margin-left:8px;letter-spacing:0;">タップで修正できます</span></div>
   <div class="history" id="history"></div>
 
   <div class="footer">
@@ -480,8 +489,17 @@
   </div>
 
 <script>
-  function todayKey() {
+  // 「1日の区切り」を午前3時にする。
+  // 0:00〜2:59 に飲んだ夜の薬は前日扱いにしたいので、現在時刻から3時間引いた日付を「その日」とする。
+  const DAY_CUTOFF_HOUR = 3;
+  function appDate() {
     const d = new Date();
+    d.setHours(d.getHours() - DAY_CUTOFF_HOUR);
+    return d;
+  }
+
+  function todayKey() {
+    const d = appDate();
     const y = d.getFullYear();
     const m = String(d.getMonth()+1).padStart(2,'0');
     const day = String(d.getDate()).padStart(2,'0');
@@ -505,7 +523,7 @@
   }
 
   function showDate() {
-    const d = new Date();
+    const d = appDate();
     const days = ['日','月','火','水','木','金','土'];
     document.getElementById('date').textContent =
       `${d.getFullYear()}年 ${d.getMonth()+1}月 ${d.getDate()}日 (${days[d.getDay()]})`;
@@ -697,7 +715,7 @@
             const taken = !!data[m.key];
             const timeText = taken ? formatTime(data[m.key]) : '—';
             return `
-              <div class="history-meal ${taken ? 'taken' : ''}">
+              <div class="history-meal hist-edit ${taken ? 'taken' : ''}" data-daykey="${key}" data-meal="${m.key}">
                 <div class="history-meal-label">${m.label}</div>
                 <div class="history-meal-time ${taken ? '' : 'skipped'}">${timeText}</div>
               </div>
@@ -715,6 +733,30 @@
       historyEl.innerHTML = '<div class="empty">履歴を読み込めませんでした</div>';
     }
   }
+
+  // 過去日のマスをタップ → 飲んだ/飲んでないを切り替え（時刻はその日の12:00を内部的に入れる）
+  function dayKeyToNoonISO(dayKey) {
+    const m = dayKey.match(/^med-(\d+)-(\d+)-(\d+)$/);
+    if (!m) return new Date().toISOString();
+    const d = new Date(+m[1], +m[2]-1, +m[3], 12, 0, 0, 0);
+    return d.toISOString();
+  }
+
+  document.getElementById('history').addEventListener('click', async (e) => {
+    const cell = e.target.closest('.hist-edit');
+    if (!cell) return;
+    const dayKey = cell.dataset.daykey;
+    const meal = cell.dataset.meal;
+    if (!dayKey || !meal) return;
+    if (!allDays[dayKey]) allDays[dayKey] = { asa: null, hiru: null, yoru: null };
+    if (allDays[dayKey][meal]) {
+      allDays[dayKey][meal] = null;
+    } else {
+      allDays[dayKey][meal] = dayKeyToNoonISO(dayKey);
+    }
+    loadHistory();
+    await saveState();
+  });
 
   // ===== タップ + 長押し =====
   const LONG_PRESS_MS = 500;
@@ -808,12 +850,12 @@
     }
   });
 
-  // 日付が変わったら（日付表示が変わったら）リロードして今日の枠を作り直す
+  // 「その日」が変わったら（＝午前3時を回ったら）リロードして新しい日の枠を作り直す
   setInterval(() => {
-    const newDate = new Date();
+    const d = appDate();
     const currentDisplay = document.getElementById('date').textContent;
     const days = ['日','月','火','水','木','金','土'];
-    const expected = `${newDate.getFullYear()}年 ${newDate.getMonth()+1}月 ${newDate.getDate()}日 (${days[newDate.getDay()]})`;
+    const expected = `${d.getFullYear()}年 ${d.getMonth()+1}月 ${d.getDate()}日 (${days[d.getDay()]})`;
     if (currentDisplay !== expected) {
       location.reload();
     }
